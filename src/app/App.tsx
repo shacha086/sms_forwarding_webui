@@ -10,10 +10,11 @@ import { SmsPage } from '../pages/SmsPage'
 import { ToolsPage } from '../pages/ToolsPage'
 import { EsimPage } from '../pages/EsimPage'
 import { LogsPage } from '../pages/LogsPage'
+import { BluetoothPage } from '../pages/BluetoothPage'
 
 const items = [
   ['overview', '概览', Activity], ['config', '基础配置', Settings2], ['push', '推送通道', Send],
-  ['sms', '发送短信', MessageSquareText], ['tools', '模组工具', Radio], ['esim', 'eSIM', Antenna], ['logs', '系统日志', ScrollText],
+  ['sms', '发送短信', MessageSquareText], ['bluetooth', '蓝牙配网', Bluetooth], ['tools', '模组工具', Radio], ['esim', 'eSIM', Antenna], ['logs', '系统日志', ScrollText],
 ] as const
 
 export function App() {
@@ -30,7 +31,7 @@ export function App() {
       </Tabs.List>
       <main className="content">
         <Tabs.Content value="overview"><OverviewPage /></Tabs.Content><Tabs.Content value="config"><ConfigPage /></Tabs.Content>
-        <Tabs.Content value="push"><PushPage /></Tabs.Content><Tabs.Content value="sms"><SmsPage /></Tabs.Content>
+        <Tabs.Content value="push"><PushPage /></Tabs.Content><Tabs.Content value="sms"><SmsPage /></Tabs.Content><Tabs.Content value="bluetooth"><BluetoothPage /></Tabs.Content>
         <Tabs.Content value="tools"><ToolsPage /></Tabs.Content><Tabs.Content value="esim"><EsimPage /></Tabs.Content><Tabs.Content value="logs"><LogsPage /></Tabs.Content>
       </main>
     </div>

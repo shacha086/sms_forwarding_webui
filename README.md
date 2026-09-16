@@ -3,6 +3,9 @@
 基于 React、TypeScript 和 Vite，使用 Radix UI 提供无样式、可访问的交互组件，
 TanStack Query 管理设备 REST API 状态。界面按 Vercel / Geist 风格设计，并针对手机操作优化。
 
+控制台同时支持 Web Bluetooth 配网：选择名称以 `SMS-` 开头的设备，使用 PIN `123456`
+完成安全配对后，可直接写入 WiFi SSID 和密码。该功能要求 HTTPS 和支持 Web Bluetooth 的浏览器。
+
 ## 本地开发
 
 需要 Node.js 20.19+ 或 22.12+。
