@@ -26,7 +26,7 @@ export function App() {
     <ConnectionBar />
     <div className="shell-body">
       <Tabs.List className={`sidebar ${mobileNav ? 'sidebar--open' : ''}`} aria-label="设备管理">
-        <span className="sidebar-label">DEVICE</span>{items.map(([value, label, Icon]) => <Tabs.Trigger key={value} value={value} className="nav-item" onClick={() => setMobileNav(false)}><Icon size={17} />{label}</Tabs.Trigger>)}
+        <span className="sidebar-label">DEVICE</span>{items.map(([value, label, Icon]) => <Tabs.Trigger key={value} value={value} className="nav-item" aria-label={label} title={label} onClick={() => setMobileNav(false)}><Icon size={17} aria-hidden /><span className="nav-label">{label}</span></Tabs.Trigger>)}
         <div className="sidebar-foot"><Wifi size={15} /><span>{status?.wifi.ssid || '等待连接'}</span>{status?.bleProvisioning && <Bluetooth size={14} />}</div>
       </Tabs.List>
       <main className="content">
