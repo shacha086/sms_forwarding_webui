@@ -9,4 +9,15 @@ export interface DeviceConfig {
   smtpSendTo: string; adminPhone: string; numberBlackList: string; pushChannels: PushChannel[]
 }
 export interface ApiResult { success?: boolean; message?: string; [key: string]: unknown }
+export type DiagnosticValue = string | number | boolean | null
+export interface DiagnosticResult extends ApiResult { data?: Record<string, DiagnosticValue> }
+export interface EsimProfile {
+  iccid: string; nickname: string; state: number; profileClass: number
+  serviceProviderName: string; profileName: string
+}
+export interface EsimResult extends ApiResult {
+  data?: { eid?: string; notificationCount?: number | null; profileCount?: number }
+  profiles?: EsimProfile[]
+  count?: number
+}
 export interface Credentials { host: string; username: string; password: string }

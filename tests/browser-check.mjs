@@ -12,16 +12,42 @@ page.on('pageerror', (error) => errors.push(error.message))
 const output = new URL('../node_modules/.ui-check/', import.meta.url)
 await mkdir(output, { recursive: true })
 let rejected = false
-await context.route('http://192.168.1.88/api/v1/**', (route) => route.fulfill({
-  status: rejected ? 401 : 200,
-  contentType: 'application/json',
-  headers: { 'Access-Control-Allow-Origin': '*' },
-  body: JSON.stringify(route.request().url().endsWith('/status') ? {
-    service: 'sms-forwarding', apiVersion: 1, uptimeSeconds: 100, freeHeap: 102400,
-    modemReady: false, limitedMode: true, configValid: true, bleProvisioning: false,
-    wifi: { connected: true, ssid: 'Test network', ip: '192.168.1.88', rssi: -40 },
-  } : { webUser: 'admin', pushChannels: [] }),
-}))
+await context.route('http://192.168.1.88/**', (route) => {
+  const url = new URL(route.request().url())
+  let body
+  if (url.pathname.endsWith('/status')) {
+    body = {
+      service: 'sms-forwarding', apiVersion: 1, uptimeSeconds: 100, freeHeap: 102400,
+      modemReady: false, limitedMode: true, configValid: true, bleProvisioning: false,
+      wifi: { connected: true, ssid: 'Test network', ip: '192.168.1.88', rssi: -40 },
+    }
+  } else if (url.pathname.endsWith('/config')) {
+    body = { webUser: 'admin', pushChannels: [] }
+  } else if (url.pathname === '/query' && url.searchParams.get('type') === 'network') {
+    body = { success: true, data: { registration: '已注册，本地网络', operator: '中国移动', dataConnection: '已激活', apn: 'cmnet' } }
+  } else if (url.pathname === '/query' && url.searchParams.get('type') === 'signal') {
+    body = { success: true, data: { rsrp: '-86 dBm (信号良好)', rsrpDbm: -86, rsrq: '-10.5 dB', quality: '信号良好', raw: '99,99,255,255,18,54' } }
+  } else if (url.pathname === '/query' && url.searchParams.get('type') === 'sim') {
+    body = { success: true, message: "<table><tr><td>IMSI</td><td>460001234567890</td></tr><tr><td>ICCID</td><td>89860012345678901234</td></tr><tr><td>本机号码</td><td>未存储或不支持</td></tr></table>" }
+  } else if (url.pathname === '/esim' && url.searchParams.get('action') === 'info') {
+    body = { success: false, message: '打开 eUICC 通道失败，无法解析响应: +CME ERROR: 13' }
+  } else if (url.pathname === '/esim' && url.searchParams.get('action') === 'list') {
+    body = { success: true, count: 2, profiles: [
+      { iccid: '89860012345678901234', nickname: '主卡', state: 1, profileClass: 2, serviceProviderName: '中国移动', profileName: 'China Mobile' },
+      { iccid: '89860198765432109876', nickname: '备用卡', state: 0, profileClass: 2, serviceProviderName: '中国联通', profileName: 'China Unicom' },
+    ] }
+  } else if (url.pathname === '/esim' && url.searchParams.get('action') === 'notifcount') {
+    body = { success: false, message: '通知查询暂未实现' }
+  } else {
+    body = { success: true, message: '操作已完成' }
+  }
+  return route.fulfill({
+    status: rejected ? 401 : 200,
+    contentType: 'application/json',
+    headers: { 'Access-Control-Allow-Origin': '*' },
+    body: JSON.stringify(body),
+  })
+})
 const password = 'browser-test-secret'
 const storageKey = 'sms-forwarding.credentials.v1'
 try {
@@ -74,6 +100,32 @@ try {
     await page.screenshot({ path: new URL(`layout-${width}.png`, output).pathname.replace(/^\/([A-Za-z]:)/, '$1'), fullPage: true })
     if (width <= 640) await item.click()
   }
+
+  await page.getByRole('tab', { name: '模组工具', exact: true }).click()
+  await page.getByRole('button', { name: /网络状态/ }).click()
+  await page.getByRole('heading', { name: '网络状态' }).waitFor()
+  assert.equal(await page.getByText('中国移动', { exact: true }).textContent(), '中国移动')
+  await page.getByRole('button', { name: /信号强度/ }).click()
+  assert.equal(await page.getByRole('progressbar', { name: '蜂窝信号强度' }).getAttribute('aria-valuenow'), '-86')
+  await page.getByRole('button', { name: /SIM 状态/ }).click()
+  assert.equal(await page.getByText('89860012345678901234', { exact: true }).textContent(), '89860012345678901234')
+  await page.screenshot({ path: new URL('tools-results-1280.png', output).pathname.replace(/^\/([A-Za-z]:)/, '$1'), fullPage: true })
+  await page.setViewportSize({ width: 390, height: 900 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'Tools page overflows at 390px')
+  await page.screenshot({ path: new URL('tools-results-390.png', output).pathname.replace(/^\/([A-Za-z]:)/, '$1'), fullPage: true })
+
+  await page.setViewportSize({ width: 1280, height: 900 })
+  await page.getByRole('tab', { name: 'eSIM', exact: true }).click()
+  const esimActions = page.locator('.action-cards .card')
+  await esimActions.filter({ hasText: '设备信息' }).getByRole('button').click()
+  await page.getByText('+CME ERROR: 13', { exact: true }).waitFor()
+  await page.screenshot({ path: new URL('esim-error-1280.png', output).pathname.replace(/^\/([A-Za-z]:)/, '$1'), fullPage: true })
+  await esimActions.filter({ hasText: '配置文件' }).getByRole('button').click()
+  assert.equal(await page.getByText('中国移动', { exact: true }).textContent(), '中国移动')
+  assert.equal(await page.getByText('已启用', { exact: true }).textContent(), '已启用')
+  await page.setViewportSize({ width: 390, height: 900 })
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, 'eSIM page overflows at 390px')
+  await page.screenshot({ path: new URL('esim-profiles-390.png', output).pathname.replace(/^\/([A-Za-z]:)/, '$1'), fullPage: true })
 
   await page.reload()
   await page.waitForFunction((expected) => document.querySelector('input[type=password]')?.value === expected, password)

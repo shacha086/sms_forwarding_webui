@@ -26,6 +26,24 @@ test('authentication failures preserve HTTP 401', async () => {
   await assert.rejects(api.getStatus(), (error) => error instanceof ApiError && error.status === 401)
 })
 
+test('diagnostic queries use the authenticated API client', async () => {
+  globalThis.fetch = async (request) => {
+    assert.equal(request.url, 'http://192.168.1.88/query?type=network')
+    assert.equal(request.headers.get('Authorization'), `Basic ${btoa('admin:changed-password')}`)
+    return Response.json({ success: true, data: { registration: '已注册，本地网络' } })
+  }
+  assert.equal((await api.getDiagnostic('network')).data.registration, '已注册，本地网络')
+})
+
+test('eSIM queries use the authenticated API client', async () => {
+  globalThis.fetch = async (request) => {
+    assert.equal(request.url, 'http://192.168.1.88/esim?action=list')
+    assert.equal(request.headers.get('Authorization'), `Basic ${btoa('admin:changed-password')}`)
+    return Response.json({ success: true, profiles: [], count: 0 })
+  }
+  assert.equal((await api.getEsim('list')).count, 0)
+})
+
 test('cancellation aborts the underlying request without reporting a network failure', async () => {
   const controller = new AbortController()
   let requestSignal
