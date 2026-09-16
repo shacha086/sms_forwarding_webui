@@ -49,7 +49,9 @@ export class BluetoothProvisioningClient {
   async connect(onStatus: StatusListener, onDisconnect: () => void) {
     if (!navigator.bluetooth) throw new Error('当前浏览器不支持 Web Bluetooth')
     this.device = await navigator.bluetooth.requestDevice({
-      filters: [{ namePrefix: 'SMS-', services: [SERVICE_UUID] }],
+      // Filter entries are ORed. Accept either the service UUID or device name
+      // so a constrained legacy advertisement does not become undiscoverable.
+      filters: [{ services: [SERVICE_UUID] }, { namePrefix: 'SMS-' }],
       optionalServices: [SERVICE_UUID],
     })
     if (!this.device.gatt) throw new Error('该设备不支持 GATT 连接')
