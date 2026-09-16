@@ -4,6 +4,7 @@ import type { Credentials } from '../api/types'
 
 export interface DeviceContextValue {
   credentials: Credentials
+  connectionId: number
   api: DeviceApi
   connected: boolean
   loading: boolean
@@ -11,6 +12,7 @@ export interface DeviceContextValue {
   status: Awaited<ReturnType<DeviceApi['getStatus']>> | undefined
   config: Awaited<ReturnType<DeviceApi['getConfig']>> | undefined
   connect: (credentials: Credentials) => void
+  disconnect: () => void
   refresh: () => Promise<void>
   notify: (message: string, error?: boolean) => void
 }

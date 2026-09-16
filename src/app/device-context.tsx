@@ -1,6 +1,6 @@
 import * as Toast from '@radix-ui/react-toast'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react'
 import { CheckCircle2, XCircle } from 'lucide-react'
 import { DeviceApi, normalizeHost } from '../api/client'
 import type { Credentials } from '../api/types'
@@ -8,26 +8,52 @@ import { DeviceContext } from './device-state'
 
 function initialCredentials(): Credentials {
   const host = normalizeHost(location.hash.slice(1))
-  return { host, username: sessionStorage.getItem('smsUser') || 'admin', password: sessionStorage.getItem('smsPass') || 'admin123' }
+  return { host, username: 'admin', password: 'admin123' }
 }
 
 export function DeviceProvider({ children }: { children: ReactNode }) {
   const [credentials, setCredentials] = useState(initialCredentials)
+  const [connectionId, setConnectionId] = useState(0)
+  const nextConnectionId = useRef(0)
   const [toast, setToast] = useState({ open: false, message: '', error: false })
   const client = useQueryClient()
   const api = useMemo(() => new DeviceApi(credentials), [credentials])
-  const enabled = Boolean(credentials.host && credentials.password)
-  const statusQuery = useQuery({ queryKey: ['status', credentials.host, credentials.username], queryFn: api.getStatus, enabled, retry: false, refetchInterval: 15_000 })
-  const configQuery = useQuery({ queryKey: ['config', credentials.host, credentials.username], queryFn: api.getConfig, enabled, retry: false })
+  const deviceQuery = useQuery({
+    // A new attempt must authenticate again, even when only the password changed.
+    queryKey: ['device', connectionId],
+    queryFn: async ({ signal }) => {
+      const status = await api.getStatus(signal)
+      const config = await api.getConfig(signal)
+      return { status, config }
+    },
+    enabled: connectionId !== 0,
+    retry: false,
+    gcTime: 0,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
+    refetchOnMount: false,
+    refetchInterval: (query) => query.state.status === 'success' ? 15_000 : false,
+  })
   const notify = useCallback((message: string, error = false) => setToast({ open: true, message, error }), [])
   const connect = useCallback((next: Credentials) => {
     const normalized = { ...next, host: normalizeHost(next.host) }
-    sessionStorage.setItem('smsUser', normalized.username); sessionStorage.setItem('smsPass', normalized.password)
-    location.hash = normalized.host; setCredentials(normalized)
-  }, [])
-  const refresh = useCallback(async () => { await Promise.all([client.invalidateQueries({ queryKey: ['status'] }), client.invalidateQueries({ queryKey: ['config'] })]) }, [client])
-  const error = (statusQuery.error || configQuery.error) as Error | undefined
-  return <DeviceContext.Provider value={{ credentials, api, connected: Boolean(statusQuery.data), loading: statusQuery.isFetching || configQuery.isFetching, error, status: statusQuery.data, config: configQuery.data, connect, refresh, notify }}>
+    if (!normalized.host || !normalized.username || !normalized.password) return
+    void client.cancelQueries({ queryKey: ['device'] })
+    location.hash = normalized.host
+    setCredentials(normalized)
+    setConnectionId(++nextConnectionId.current)
+  }, [client])
+  const disconnect = useCallback(() => {
+    void client.cancelQueries({ queryKey: ['device'] })
+    setConnectionId(0)
+  }, [client])
+  const refresh = useCallback(async () => {
+    if (connectionId) await client.invalidateQueries({ queryKey: ['device', connectionId] })
+  }, [client, connectionId])
+  const connected = connectionId !== 0 && deviceQuery.isSuccess
+  const loading = connectionId !== 0 && deviceQuery.isPending
+  const error = deviceQuery.error || undefined
+  return <DeviceContext.Provider value={{ credentials, connectionId, api, connected, loading, error, status: connected ? deviceQuery.data?.status : undefined, config: connected ? deviceQuery.data?.config : undefined, connect, disconnect, refresh, notify }}>
     {children}
     <Toast.Provider swipeDirection="right">
       <Toast.Root className={`toast ${toast.error ? 'toast--error' : ''}`} open={toast.open} onOpenChange={(open) => setToast((value) => ({ ...value, open }))}>

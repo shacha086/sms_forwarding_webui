@@ -4,11 +4,28 @@ import { useDevice } from '../app/device-state'
 import { Button, Card, EmptyState, Field, SectionTitle, TextArea } from '../components/ui'
 
 export function ConfigPage() {
-  const { config, api, notify, refresh } = useDevice(); const [values, setValues] = useState<Record<string, string>>({})
+  const { config, api, notify, refresh, credentials, connect } = useDevice(); const [values, setValues] = useState<Record<string, string>>({})
   useEffect(() => { if (config) setValues({ webUser: config.webUser, webPass: '', smtpServer: config.smtpServer, smtpPort: String(config.smtpPort), smtpUser: config.smtpUser, smtpPass: '', smtpSendTo: config.smtpSendTo, adminPhone: config.adminPhone, numberBlackList: config.numberBlackList }) }, [config])
   if (!config) return <EmptyState>连接设备后编辑配置。</EmptyState>
   const set = (name: string, value: string) => setValues((old) => ({ ...old, [name]: value }))
-  async function save(event: FormEvent) { event.preventDefault(); const body = new URLSearchParams(values); if (!values.webPass) body.delete('webPass'); if (!values.smtpPass) body.delete('smtpPass'); const result = await api.post('/api/v1/config', body); notify(result.message || '配置已保存'); await refresh() }
+  async function save(event: FormEvent) {
+    event.preventDefault()
+    const body = new URLSearchParams(values)
+    if (!values.webPass) body.delete('webPass')
+    if (!values.smtpPass) body.delete('smtpPass')
+    try {
+      const result = await api.post('/api/v1/config', body)
+      if (result.success === false) throw new Error(result.message || '配置保存失败')
+      notify(result.message || '配置已保存')
+      if (values.webPass || values.webUser !== credentials.username) {
+        connect({ ...credentials, username: values.webUser, password: values.webPass || credentials.password })
+      } else {
+        await refresh()
+      }
+    } catch (error) {
+      notify(error instanceof Error ? error.message : '配置保存失败', true)
+    }
+  }
   async function wifi(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const body = new FormData(event.currentTarget); const result = await api.post('/api/v1/wifi', { action: 'connect', ssid: String(body.get('ssid')), password: String(body.get('password')) }); notify(result.message || 'WiFi 切换已开始') }
   return <><SectionTitle eyebrow="CONFIGURATION" title="基础配置" description="管理认证、邮件通知、管理员号码与网络凭据。" />
     <Card><form onSubmit={save}><div className="form-section"><h3>管理认证</h3><div className="form-grid"><Field label="管理账号" value={values.webUser || ''} onChange={(e) => set('webUser', e.target.value)} /><Field label="新密码" type="password" value={values.webPass || ''} hint="留空保留当前密码" onChange={(e) => set('webPass', e.target.value)} /></div></div>
