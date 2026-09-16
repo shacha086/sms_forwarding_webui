@@ -32,6 +32,26 @@ try {
   await page.getByRole('button', { name: '连接', exact: true }).click()
   await page.getByRole('status').filter({ hasText: '连接失败' }).waitFor()
   assert.equal(await page.evaluate((key) => localStorage.getItem(key), storageKey), null)
+  for (const width of [320, 478, 640, 641, 808, 900, 1280]) {
+    await page.setViewportSize({ width, height: 900 })
+    const alert = page.getByRole('alert').filter({ hasText: '管理账号或密码错误' })
+    const box = await alert.boundingBox()
+    const form = await page.locator('.connection-bar').evaluate((element) => {
+      const bounds = element.getBoundingClientRect()
+      const style = getComputedStyle(element)
+      return { left: bounds.left + parseFloat(style.paddingLeft), right: bounds.right - parseFloat(style.paddingRight) }
+    })
+    assert.ok(box)
+    assert.ok(Math.abs(box.x - form.left) < 1, `Error left edge does not align with form at ${width}`)
+    assert.ok(Math.abs(box.x + box.width - form.right) < 1, `Error right edge does not align with form at ${width}`)
+    const padding = await alert.evaluate((element) => {
+      const style = getComputedStyle(element)
+      return [style.paddingTop, style.paddingRight, style.paddingBottom, style.paddingLeft]
+    })
+    assert.deepEqual(padding, ['12px', '16px', '12px', '16px'])
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false, `Error overflow at ${width}`)
+    await page.screenshot({ path: new URL(`error-${width}.png`, output).pathname.replace(/^\/([A-Za-z]:)/, '$1') })
+  }
   rejected = false
   await page.getByRole('button', { name: '连接', exact: true }).click()
   await page.getByRole('heading', { name: '系统概览' }).waitFor()
@@ -73,7 +93,7 @@ try {
   await page.getByLabel('密码', { exact: true }).fill('new-session')
   assert.equal(await page.getByLabel('记住密码', { exact: true }).isChecked(), false)
   assert.deepEqual(errors, [])
-  console.log('PASS: failed authentication, encrypted save, reload, no auto-connect, host isolation, forget, seven viewport layouts, no page errors')
+  console.log('PASS: failed authentication, error padding/alignment, encrypted save, reload, no auto-connect, host isolation, forget, seven viewport layouts, no page errors')
 } finally {
   await browser.close()
 }
