@@ -51,7 +51,7 @@ export class BluetoothProvisioningClient {
     this.device = await navigator.bluetooth.requestDevice({
       // Filter entries are ORed. Accept either the service UUID or device name
       // so a constrained legacy advertisement does not become undiscoverable.
-      filters: [{ services: [SERVICE_UUID] }, { namePrefix: 'SMS-' }],
+      filters: [{ services: [SERVICE_UUID] }, { namePrefix: 'SMS-' }, { namePrefix: 'ESTKme-' }],
       optionalServices: [SERVICE_UUID],
     })
     if (!this.device.gatt) throw new Error('该设备不支持 GATT 连接')

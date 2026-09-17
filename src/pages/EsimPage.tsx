@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Bell, CheckCircle2, List, ScanLine } from 'lucide-react'
+import { AlertTriangle, Bell, CheckCircle2, List, Power, ScanLine, Trash2 } from 'lucide-react'
 import type { EsimProfile, EsimResult } from '../api/types'
 import { useDevice } from '../app/device-state'
 import { Button, Card, EmptyState, SectionTitle } from '../components/ui'
@@ -33,7 +33,7 @@ function errorView(title: string, result: EsimResult): EsimView {
 export function EsimPage() {
   const { connected, api, notify } = useDevice()
   const [view, setView] = useState<EsimView>()
-  const [busy, setBusy] = useState<EsimAction>()
+  const [busy, setBusy] = useState<string>()
   if (!connected) return <EmptyState>连接设备后管理 eSIM。</EmptyState>
 
   async function run(action: EsimAction, title: string) {
@@ -61,12 +61,50 @@ export function EsimPage() {
     }
   }
 
+  async function manageProfile(action: 'disable' | 'switch' | 'delete', profile: EsimProfile) {
+    const label = action === 'delete' ? '删除' : action === 'disable' ? '禁用' : '切换/启用'
+    const profileName = profile.nickname || profile.profileName || profile.iccid
+    const warning = action === 'delete'
+      ? `确定删除配置文件 ${profileName}？此操作不可恢复。`
+      : `确定${label}配置文件 ${profileName}？`
+    if (!window.confirm(warning)) return
+
+    const operation = `${action}:${profile.iccid}`
+    setBusy(operation)
+    try {
+      const result = await api.getEsim(action, profile.iccid)
+      if (result.success === false) {
+        setView(errorView(`${label}失败`, result))
+        notify(result.message || `${label}失败`, true)
+        return
+      }
+      notify(result.message || `${label}成功`)
+      const refreshed = await api.getEsim('list')
+      setView(refreshed.success === false
+        ? errorView('配置列表刷新失败', refreshed)
+        : { kind: 'profiles', profiles: refreshed.profiles || [] })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : `${label}失败`
+      setView({ kind: 'error', title: `${label}失败`, message })
+      notify(message, true)
+    } finally {
+      setBusy(undefined)
+    }
+  }
+
   return <><SectionTitle eyebrow="EUICC" title="eSIM 管理" description="读取 EID、配置文件和待处理通知。" />
     <div className="action-cards"><Card><ScanLine size={21} /><h3>设备信息</h3><p>读取 eUICC EID 与当前状态。</p><Button variant="secondary" disabled={Boolean(busy)} onClick={() => run('info', '设备信息读取')}>{busy === 'info' ? '查询中…' : '查询'}</Button></Card><Card><List size={21} /><h3>配置文件</h3><p>列出芯片中的运营商配置。</p><Button variant="secondary" disabled={Boolean(busy)} onClick={() => run('list', '配置文件读取')}>{busy === 'list' ? '读取中…' : '刷新'}</Button></Card><Card><Bell size={21} /><h3>待处理通知</h3><p>检查服务器上的待处理通知数量。</p><Button variant="secondary" disabled={Boolean(busy)} onClick={() => run('notifcount', '通知查询')}>{busy === 'notifcount' ? '查询中…' : '查询'}</Button></Card></div>
     {!view && <Card className="esim-placeholder"><ScanLine size={24} /><div><strong>等待查询</strong><p>选择上方项目读取 eUICC 数据。</p></div></Card>}
     {view?.kind === 'error' && <Card className="esim-result esim-error"><AlertTriangle size={24} /><div><span className="eyebrow">QUERY FAILED</span><h3>{view.title}</h3><p>{view.message}</p>{view.code && <code>{view.code}</code>}<small>请确认 SIM/eUICC 已就绪、模组不在限制模式，然后重试。</small></div></Card>}
     {view?.kind === 'info' && <Card className="esim-result"><div className="card-heading esim-heading"><div><span className="eyebrow">EUICC STATUS</span><h3>设备信息</h3></div><span className="result-badge"><CheckCircle2 size={14} />读取完成</span></div><dl className="esim-info-grid"><div className="esim-eid"><dt>EID</dt><dd>{view.eid}</dd></div><div><dt>配置文件</dt><dd>{view.profileCount == null || view.profileCount < 0 ? '—' : `${view.profileCount} 个`}</dd></div><div><dt>待处理通知</dt><dd>{view.notificationCount == null ? '暂不支持' : `${view.notificationCount} 条`}</dd></div></dl></Card>}
-    {view?.kind === 'profiles' && <Card className="esim-result"><div className="card-heading esim-heading"><div><span className="eyebrow">PROFILES</span><h3>配置文件</h3></div><span className="result-badge"><CheckCircle2 size={14} />{view.profiles.length} 个</span></div>{view.profiles.length === 0 ? <div className="esim-empty">芯片中没有可用的运营商配置。</div> : <div className="esim-profile-list">{view.profiles.map((profile, index) => <article className="esim-profile" key={profile.iccid || index}><div><span className={`profile-state ${profile.state === 1 ? 'profile-state--active' : ''}`}>{profile.state === 1 ? '已启用' : profile.state === 0 ? '已禁用' : '状态未知'}</span><h4>{profile.nickname || profile.profileName || `配置 ${index + 1}`}</h4><p>{profile.serviceProviderName || '未知运营商'}</p></div><dl><div><dt>ICCID</dt><dd>{profile.iccid || '—'}</dd></div><div><dt>配置类别</dt><dd>{profile.profileClass}</dd></div></dl></article>)}</div>}</Card>}
+    {view?.kind === 'profiles' && <Card className="esim-result"><div className="card-heading esim-heading"><div><span className="eyebrow">PROFILES</span><h3>配置文件</h3></div><span className="result-badge"><CheckCircle2 size={14} />{view.profiles.length} 个</span></div>{view.profiles.length === 0 ? <div className="esim-empty">芯片中没有可用的运营商配置。</div> : <div className="esim-profile-list">{view.profiles.map((profile, index) => {
+      const active = profile.state === 1
+      const operating = Boolean(busy?.endsWith(`:${profile.iccid}`))
+      return <article className="esim-profile" key={profile.iccid || index}><div><span className={`profile-state ${active ? 'profile-state--active' : ''}`}>{active ? '已启用' : profile.state === 0 ? '已禁用' : '状态未知'}</span><h4>{profile.nickname || profile.profileName || `配置 ${index + 1}`}</h4><p>{profile.serviceProviderName || '未知运营商'}</p></div><dl><div><dt>ICCID</dt><dd>{profile.iccid || '—'}</dd></div><div><dt>配置类别</dt><dd>{profile.profileClass}</dd></div></dl><div className="esim-profile-actions">{active
+        ? <Button type="button" variant="secondary" disabled={Boolean(busy)} onClick={() => manageProfile('disable', profile)}><Power size={14} />{operating ? '处理中…' : '禁用'}</Button>
+        : <Button type="button" disabled={Boolean(busy)} onClick={() => manageProfile('switch', profile)}><Power size={14} />{operating ? '处理中…' : '切换/启用'}</Button>}
+        <Button type="button" variant="danger" disabled={Boolean(busy)} onClick={() => manageProfile('delete', profile)}><Trash2 size={14} />删除</Button></div></article>
+    })}</div>}</Card>}
     {view?.kind === 'notifications' && <Card className="esim-result"><div className="notification-count"><Bell size={24} /><span>待处理通知</span><strong>{view.count}</strong><small>条</small></div></Card>}
   </>
 }

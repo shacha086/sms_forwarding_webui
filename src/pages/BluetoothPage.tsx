@@ -90,7 +90,7 @@ export function BluetoothPage() {
   return <><SectionTitle eyebrow="WIRELESS SETUP" title="蓝牙配网" description="无需先连接设备热点，直接通过 BLE 写入新的 WiFi 凭据。" />
     {!support.available && <Card className="notice-card notice-card--error"><Bluetooth size={20} /><div><strong>此环境无法使用蓝牙配网</strong><p>{support.reason}</p></div></Card>}
     <div className="provisioning-steps">
-      <Card className={phase !== 'idle' ? 'step-card step-card--done' : 'step-card'}><span className="step-number">1</span><RadioTower size={20} /><strong>选择设备</strong><p>选择名称以 SMS- 开头的设备。</p></Card>
+      <Card className={phase !== 'idle' ? 'step-card step-card--done' : 'step-card'}><span className="step-number">1</span><RadioTower size={20} /><strong>选择设备</strong><p>选择名称以 SMS- 或 ESTKme- 开头的设备。</p></Card>
       <Card className={['provisioning', 'success'].includes(phase) ? 'step-card step-card--done' : 'step-card'}><span className="step-number">2</span><LockKeyhole size={20} /><strong>安全配对</strong><p>系统询问 PIN 时输入 123456。</p></Card>
       <Card className={phase === 'success' ? 'step-card step-card--done' : 'step-card'}><span className="step-number">3</span><Wifi size={20} /><strong>连接 WiFi</strong><p>写入网络名称和密码。</p></Card>
     </div>
@@ -100,6 +100,6 @@ export function BluetoothPage() {
         : <form className="ble-form" onSubmit={provision}><div className="form-grid"><Field label="WiFi 名称（SSID）" name="ssid" required maxLength={32} defaultValue={status?.ssid || ''} autoComplete="off" /><Field label="WiFi 密码" name="password" type="password" maxLength={63} autoComplete="new-password" hint="开放网络可留空" /></div><div className="ble-actions"><Button type="button" variant="secondary" onClick={() => { intentionalDisconnect.current = true; client.current?.disconnect(); setPhase('idle'); setDeviceName('') }}>断开</Button><Button disabled={busy}>{phase === 'provisioning' ? <LoaderCircle className="spin" size={16} /> : <Wifi size={16} />}{phase === 'provisioning' ? '设备连接中…' : '发送并连接'}</Button></div></form>}
     </Card>
     {phase === 'success' && <Card className="notice-card notice-card--success"><CheckCircle2 size={22} /><div><strong>WiFi 配置成功</strong><p>{status?.ssid}{status?.ip ? ` · ${status.ip}` : ''}</p></div>{status?.ip && <Button onClick={openDevice}>连接设备控制台</Button>}</Card>}
-    <Card className="ble-help"><span className="eyebrow">BEFORE YOU START</span><h3>设备没有出现在列表中？</h3><p>WiFi 未连接时 BLE 会自动开启；已有网络连接时，可在设备控制台通过网络设置重新开启 BLE。设备在正常联网五分钟后会关闭 BLE，以释放内存。</p></Card>
+    <Card className="ble-help"><span className="eyebrow">BEFORE YOU START</span><h3>设备没有出现在列表中？</h3><p>设备会持续提供 BLE，并在未连接时轮换 SMS- 与 ESTKme- 名称；等待约两秒后重新打开设备选择器。</p></Card>
   </>
 }

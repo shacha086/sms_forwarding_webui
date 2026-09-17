@@ -43,8 +43,11 @@ export class DeviceApi {
   getLogs = (signal?: AbortSignal) => this.request<string[]>('/api/v1/logs', { signal }, 10_000)
   getDiagnostic = (type: 'network' | 'signal' | 'sim' | 'wifi' | 'ati', signal?: AbortSignal) =>
     this.request<DiagnosticResult>(`/query?type=${encodeURIComponent(type)}`, { signal }, 15_000)
-  getEsim = (action: 'info' | 'list' | 'notifcount', signal?: AbortSignal) =>
-    this.request<EsimResult>(`/esim?action=${encodeURIComponent(action)}`, { signal }, 30_000)
+  getEsim = (action: 'info' | 'list' | 'notifcount' | 'enable' | 'disable' | 'switch' | 'delete', iccid?: string, signal?: AbortSignal) => {
+    const query = new URLSearchParams({ action })
+    if (iccid) query.set('iccid', iccid)
+    return this.request<EsimResult>(`/esim?${query.toString()}`, { signal }, 60_000)
+  }
   post(path: string, values: URLSearchParams | Record<string, string>) {
     const body = values instanceof URLSearchParams ? values : new URLSearchParams(values)
     return this.request<ApiResult>(path, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }, body })
